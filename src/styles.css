@@ -1,0 +1,368 @@
+/* ---- flapboard: split-flap (Vestaboard-style) display ----
+ *
+ * The visual half of the board. The engine decides when each tile flips; this
+ * is what a flip looks like. `--cols` (column count) and `--sf-fold` (base fold
+ * duration) are set inline by the React view; `--sf-cell-fold` is set per tile.
+ * Uses `--font-geist-sans` if the host app defines it, else falls back. */
+.sf-board {
+  --cols: 23;
+  --sf-fold: 105ms; /* fallback; the component sets this inline to match the timing */
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: clamp(2px, 0.55cqi, 4px);
+  width: min(100%, 980px);
+  margin-inline: auto;
+  padding: clamp(14px, 3.4cqi, 32px);
+  border-radius: 18px;
+  background: linear-gradient(#141414, #060606);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7),
+    0 30px 60px -30px rgba(0, 0, 0, 0.8);
+  contain: layout paint style;
+  isolation: isolate;
+}
+
+.sf-cell {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 3px;
+  background: #0b0b0c;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    inset 0 1px 2px rgba(255, 255, 255, 0.03),
+    inset 0 -3px 7px rgba(0, 0, 0, 0.5);
+  /* Each tile is self-contained: its paint never escapes its box, so the
+     browser can rasterize/skip it independently instead of invalidating the
+     whole board when one tile flips. */
+  contain: layout paint style;
+}
+
+.sf-unit {
+  position: absolute;
+  inset: clamp(1px, 0.3cqi, 2px);
+  font-size: clamp(10px, 3.25cqi, 26px);
+  line-height: 1;
+  perspective: 38cqi;
+  perspective-origin: 50% 42%;
+  transform-style: preserve-3d;
+}
+
+/* The hinge groove: a crisp dark line that cuts through every glyph at the
+   midline, so each tile reads as two physical flaps. Sits above the static
+   halves but below the flapping cards, which fold over it as they move. */
+.sf-unit::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 1.5px);
+  height: 3px;
+  background: linear-gradient(
+    rgba(0, 0, 0, 0.55),
+    #000 45%,
+    #000 55%,
+    rgba(255, 255, 255, 0.05)
+  );
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.85);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.sf-half,
+.sf-flip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(50% - 1px);
+  overflow: hidden;
+  color: #f5f4f1;
+}
+
+/* The 3D context only needs to exist on the cards that actually rotate. Keeping
+   backface-visibility/preserve-3d off the static halves stops the compositor
+   from promoting all of them to permanent GPU layers — that idle layer pile is
+   what made the page stutter while scrolling. The flapping cards opt back in
+   via the .sf-flip rule below, and only exist while animating. */
+.sf-flip {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.sf-top {
+  top: 0;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(#1c1c1e, #131314);
+}
+
+.sf-bottom {
+  bottom: 0;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(#121213, #08080a);
+}
+
+.sf-g {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 200%;
+}
+
+.sf-g-char {
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.sf-g-mark {
+  display: block;
+  overflow: visible;
+}
+
+.sf-whole-face {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.sf-whole-face .sf-g {
+  top: 0;
+  bottom: auto;
+  height: 100%;
+}
+
+.sf-g-whole {
+  display: block;
+  overflow: visible;
+}
+
+.sf-svg-text {
+  fill: #f5f4f1;
+  font-family:
+    var(--font-geist-sans), "Noto Sans Kannada", "Noto Sans", system-ui,
+    sans-serif;
+  font-size: 82px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.sf-g-whole[data-dense="true"] .sf-svg-text {
+  font-size: 76px;
+}
+
+.sf-whole-face .sf-text {
+  font-size: 1.08em;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.05;
+  max-width: 100%;
+  text-transform: none;
+  transform: none;
+}
+
+.sf-text {
+  color: #f5f4f1;
+  display: block;
+  font-family:
+    var(--font-geist-sans), "Noto Sans Kannada", "Noto Sans", system-ui,
+    sans-serif;
+  font-size: 1.16em;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  max-width: 100%;
+  text-align: center;
+  text-transform: uppercase;
+  transform: translateY(-0.005em);
+  white-space: nowrap;
+}
+
+/* Complex scripts (Thai, Telugu, CJK, Arabic…) carry stacked marks and wider
+   bodies, so they render a touch smaller than Latin — but large enough that the
+   hinge seam reads as a deliberate split rather than slicing a tiny glyph. */
+.sf-g-char[data-complex="true"] .sf-text {
+  font-size: 0.92em;
+  line-height: 1;
+  transform: none;
+}
+
+.sf-whole-face .sf-g-char[data-complex="true"] .sf-text {
+  font-size: 1.04em;
+  line-height: 1.05;
+}
+
+.sf-whole-face .sf-g-char[data-dense="true"] .sf-text {
+  font-size: 0.98em;
+  transform: scaleX(0.78);
+  transform-origin: center;
+}
+
+.sf-cell[data-whole-glyph="true"] .sf-unit::after {
+  z-index: 3;
+  opacity: 0.5;
+}
+
+.sf-mark {
+  fill: none;
+  stroke: #f5f4f1;
+  stroke-width: 7;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.sf-top .sf-g {
+  top: 0;
+}
+
+.sf-bottom .sf-g {
+  bottom: 0;
+}
+
+.sf-flip {
+  z-index: 3;
+  will-change: transform;
+}
+
+/* A flap falls under gravity: the upper leaf (hinged at its base) tips forward,
+   starting slow and accelerating as it drops, then hands its momentum to the
+   lower leaf at the hinge. The lower leaf keeps falling, slams flat, and rebounds
+   twice before settling — the little bounce is what sells the weight of a real
+   card. A falling leaf also catches less light, so it darkens edge-on and
+   brightens as it lands. The whole motion is split ~42/58 across one drum step:
+   the top leaf falls for the first 42%, the bottom leaf falls + bounces for the
+   rest, so a full physical flip completes within a single step. */
+.sf-flip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sf-flip::before {
+  content: none;
+}
+
+.sf-flip .sf-g {
+  transform: translateZ(0.6px);
+}
+
+.sf-flip.sf-top {
+  transform-origin: center bottom;
+  animation: sf-fold-top calc(var(--sf-cell-fold, var(--sf-fold)) * 0.68) linear
+    forwards;
+}
+
+.sf-flip.sf-top::after {
+  animation: sf-shade-down calc(var(--sf-cell-fold, var(--sf-fold)) * 0.68)
+    linear forwards;
+}
+
+.sf-flip.sf-bottom {
+  transform: rotateX(92deg);
+  transform-origin: center top;
+  animation: sf-fold-bottom calc(var(--sf-cell-fold, var(--sf-fold)) * 0.62)
+    linear calc(var(--sf-cell-fold, var(--sf-fold)) * 0.52) forwards;
+}
+
+.sf-flip.sf-bottom::after {
+  opacity: 0.72;
+  animation: sf-shade-up calc(var(--sf-cell-fold, var(--sf-fold)) * 0.62) linear
+    calc(var(--sf-cell-fold, var(--sf-fold)) * 0.52) forwards;
+}
+
+@keyframes sf-fold-top {
+  0% {
+    transform: rotateX(0deg) translateZ(0);
+  }
+  18% {
+    transform: rotateX(-18deg) translateZ(0.8px);
+  }
+  48% {
+    transform: rotateX(-54deg) translateZ(1px);
+  }
+  72% {
+    transform: rotateX(-82deg) translateZ(1px);
+  }
+  to {
+    transform: rotateX(-98deg) translateZ(0.8px);
+  }
+}
+
+/* Fall into place with a small mechanical catch, not a springy bounce. */
+@keyframes sf-fold-bottom {
+  0% {
+    transform: rotateX(96deg) translateZ(1px);
+  }
+  34% {
+    transform: rotateX(52deg) translateZ(0.9px);
+  }
+  62% {
+    transform: rotateX(14deg) translateZ(0.5px);
+  }
+  82% {
+    transform: rotateX(-4deg);
+  }
+  92% {
+    transform: rotateX(1.5deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes sf-shade-down {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.42;
+  }
+  to {
+    opacity: 0.72;
+  }
+}
+
+@keyframes sf-shade-up {
+  0% {
+    opacity: 0.72;
+  }
+  48% {
+    opacity: 0.28;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.sf-flip.sf-bottom .sf-g {
+  animation: sf-slam-text calc(var(--sf-cell-fold, var(--sf-fold)) * 0.62)
+    linear calc(var(--sf-cell-fold, var(--sf-fold)) * 0.52) forwards;
+}
+
+@keyframes sf-slam-text {
+  0% {
+    transform: translateZ(0.6px) translateY(0);
+  }
+  72% {
+    transform: translateZ(0.6px) translateY(0.8%);
+  }
+  100% {
+    transform: translateZ(0.6px) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-flip,
+  .sf-flip::after {
+    animation: none !important;
+  }
+}

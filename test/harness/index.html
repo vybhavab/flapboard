@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>flapboard visual harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+      /* A fixed, neutral page so screenshots only capture the board. The board
+         falls back to system-ui when --font-geist-sans is absent; we pin a
+         single family so frames are stable within a platform. */
+      #root {
+        --font-geist-sans: "Helvetica Neue", Arial, sans-serif;
+        padding: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,96 @@
+{
+  "name": "flapboard",
+  "version": "0.1.0",
+  "description": "A split-flap display engine for your browser.",
+  "keywords": [
+    "animation",
+    "display",
+    "react",
+    "split-flap",
+    "vestaboard"
+  ],
+  "homepage": "https://github.com/vybhavab/flapboard#readme",
+  "bugs": {
+    "url": "https://github.com/vybhavab/flapboard/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vybhavab/flapboard.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "*.css",
+    "dist/styles.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint . --type-aware --react-plugin --react-perf-plugin --ignore-pattern dist --ignore-pattern playwright-report --ignore-pattern test-results",
+    "format": "oxfmt --check .",
+    "format:write": "oxfmt --write .",
+    "check": "pnpm lint && pnpm format",
+    "fix": "oxlint . --fix --type-aware --react-plugin --react-perf-plugin --ignore-pattern dist --ignore-pattern playwright-report --ignore-pattern test-results && oxfmt --write .",
+    "test": "pnpm run test:unit && pnpm run test:visual",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish",
+    "prepare": "husky",
+    "prepublishOnly": "pnpm check && pnpm typecheck && pnpm test:unit && pnpm build"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "husky": "^9.1.7",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.69.0",
+    "oxlint-tsgolint": "^0.23.0",
+    "pkg-pr-new": "^0.0.75",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.1",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "ultracite": "^7.8.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  }
+}
