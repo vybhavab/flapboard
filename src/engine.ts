@@ -173,8 +173,8 @@ export class FlapBoard {
         const target = grid[r][c];
         m.target = target;
         // Re-index against the freshly built drum (indices may have shifted).
-        m.index = this.indexMap.get(flapKey(m.current)) ?? 0;
-        m.targetIndex = this.indexMap.get(flapKey(target)) ?? m.index;
+        m.index = this.drumIndex(m.current);
+        m.targetIndex = this.drumIndex(target);
 
         if (m.index === m.targetIndex) {
           // Already showing the target — halt here (handles "retarget to where I am").
@@ -252,6 +252,20 @@ export class FlapBoard {
 
   private motorAt(row: number, col: number): Motor {
     return this.motors[row * this.cols + col];
+  }
+
+  /**
+   * The drum index of a flap. `buildDrum` gives every flap any motor shows and
+   * every target its own slot, so for any flap in play this always resolves.
+   * If it ever doesn't, the drum was built wrong — throw rather than paper over
+   * it with a fallback index that would silently flip to the wrong glyph.
+   */
+  private drumIndex(flap: Flap): number {
+    const index = this.indexMap.get(flapKey(flap));
+    if (index === undefined) {
+      throw new Error(`flapboard: flap ${flapKey(flap)} is not on the drum`);
+    }
+    return index;
   }
 
   private jitterSpeed(): number {
