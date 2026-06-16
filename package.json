@@ -1,6 +1,6 @@
 {
   "name": "@vybhavab/flapboard",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "description": "A split-flap display engine for your browser.",
   "keywords": [
     "animation",
