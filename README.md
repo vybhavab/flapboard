@@ -2,8 +2,7 @@
 
 A split-flap display engine for your browser.
 
-[board.webm](https://github.com/user-attachments/assets/b0d48ecb-2014-45da-9155-03f82d016a12)
-
+![A flapboard cascading between messages](docs/assets/board.gif)
 
 The board is modelled as a **state machine of autonomous motors**, not a set of CSS transitions.
 
