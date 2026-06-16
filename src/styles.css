@@ -3,41 +3,119 @@
  * The visual half of the board. The engine decides when each tile flips; this
  * is what a flip looks like. `--cols` (column count) and `--sf-fold` (base fold
  * duration) are set inline by the React view; `--sf-cell-fold` is set per tile.
+ *
+ * Theming: every colour, gradient, radius, shadow and the flap texture is read
+ * from a `--sf-*` design token, declared with its default value on `.sf-board`
+ * below. The defaults are the `flapboard` house look (a Vestaboard-style stealth
+ * slab), so an un-themed board is unchanged. A consumer retheme it two ways:
+ *   1. the `theme` prop on <FlapBoard>, which sets `data-flap-theme` and pulls
+ *      in a shipped preset (see the `[data-flap-theme=…]` blocks at the bottom);
+ *   2. plain CSS — override any `--sf-*` token on `.sf-board` (or any ancestor)
+ *      from the host app. The board is intentionally un-opinionated; nothing is
+ *      baked in that a token can't reach.
+ *
  * Uses `--font-geist-sans` if the host app defines it, else falls back. */
 .sf-board {
   --cols: 23;
   --sf-fold: 105ms; /* fallback; the component sets this inline to match the timing */
+
+  /* ---- design tokens (defaults = the "flapboard" house look) ---- */
+  --sf-font:
+    var(--font-geist-sans), "Noto Sans Kannada", "Noto Sans", system-ui,
+    sans-serif;
+  /* board frame */
+  --sf-board-bg: linear-gradient(#141414, #060606);
+  --sf-board-radius: 18px;
+  --sf-board-pad: clamp(14px, 3.4cqi, 32px);
+  --sf-board-gap: clamp(2px, 0.55cqi, 4px);
+  --sf-board-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7), 0 30px 60px -30px rgba(0, 0, 0, 0.8);
+  /* tile well (the recessed slot a flap sits in) */
+  --sf-cell-bg: #0b0b0c;
+  --sf-cell-radius: 3px;
+  /* Tile shape: width-to-height ratio of one chip. The house look is a Vesta-ish
+     5/7 portrait cell; a theme can override this to make chips taller (e.g. the
+     flipflap cards). Width is fixed by the column count, so a taller ratio grows
+     the chip's height and the board with it. */
+  --sf-cell-aspect: 5 / 7;
+  --sf-cell-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+    inset 0 1px 2px rgba(255, 255, 255, 0.03),
+    inset 0 -3px 7px rgba(0, 0, 0, 0.5);
+  /* the two flap leaves */
+  --sf-top-bg: linear-gradient(#1c1c1e, #131314);
+  --sf-bottom-bg: linear-gradient(#121213, #08080a);
+  /* The grille: a short opaque vent band sitting below the two flaps, filling the
+     bottom `--sf-grille-height` of each tile — the slot the drum turns behind on a
+     real unit. The house look ships none of it (zero height), so the two leaves
+     split the tile evenly and the lower leaf fills to the bottom edge; flipflap
+     opts into a textured drum. */
+  --sf-grille-bg: transparent;
+  --sf-grille-height: 0px;
+  /* Optional nudge for the glyph faces. No longer needed for grille centring —
+     the flaps live above the grille and the glyph centres in that area on its
+     own — but kept as a token so a theme can still fine-tune type position. */
+  --sf-glyph-shift: 0;
+  /* hinge seam at the midline */
+  --sf-hinge-bg: linear-gradient(
+    rgba(0, 0, 0, 0.55),
+    #000 45%,
+    #000 55%,
+    rgba(255, 255, 255, 0.05)
+  );
+  --sf-hinge-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.85);
+  /* glyphs */
+  --sf-text-color: #f5f4f1;
+  --sf-text-weight: 300;
+  --sf-text-tracking: 0.01em;
+  --sf-mark-color: var(--sf-text-color);
+
   container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(var(--cols), 1fr);
-  gap: clamp(2px, 0.55cqi, 4px);
+  gap: var(--sf-board-gap);
   width: min(100%, 980px);
   margin-inline: auto;
-  padding: clamp(14px, 3.4cqi, 32px);
-  border-radius: 18px;
-  background: linear-gradient(#141414, #060606);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.7),
-    0 30px 60px -30px rgba(0, 0, 0, 0.8);
+  padding: var(--sf-board-pad);
+  border-radius: var(--sf-board-radius);
+  background: var(--sf-board-bg);
+  box-shadow: var(--sf-board-shadow);
   contain: layout paint style;
   isolation: isolate;
 }
 
 .sf-cell {
   position: relative;
-  aspect-ratio: 5 / 7;
-  border-radius: 3px;
-  background: #0b0b0c;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.025),
-    inset 0 1px 2px rgba(255, 255, 255, 0.03),
-    inset 0 -3px 7px rgba(0, 0, 0, 0.5);
+  aspect-ratio: var(--sf-cell-aspect);
+  border-radius: var(--sf-cell-radius);
+  background: var(--sf-cell-bg);
+  box-shadow: var(--sf-cell-shadow);
   /* Each tile is self-contained: its paint never escapes its box, so the
      browser can rasterize/skip it independently instead of invalidating the
      whole board when one tile flips. */
   contain: layout paint style;
+}
+
+.sf-cell[data-color-flap="true"] {
+  box-shadow: none;
+}
+
+.sf-cell[data-color-flap="true"]::before {
+  content: "";
+  position: absolute;
+  /* The settled colour cover sits inside the same bezel inset as `.sf-unit`, so a
+     colour chip is exactly as wide as a glyph tile (not a wider full-bleed block)
+     and its width doesn't jump between flipping and settled. It covers the flap
+     area only, ending where the grille begins — the bottom `--sf-grille-height`
+     is the back of the card (the drum slot) and stays bare, never tinted. */
+  inset: clamp(1px, 0.3cqi, 2px);
+  bottom: var(--sf-grille-height);
+  border-radius: inherit;
+  background: var(--sf-color-flap);
+  pointer-events: none;
 }
 
 .sf-unit {
@@ -50,26 +128,41 @@
   transform-style: preserve-3d;
 }
 
-/* The hinge groove: a crisp dark line that cuts through every glyph at the
-   midline, so each tile reads as two physical flaps. Sits above the static
-   halves but below the flapping cards, which fold over it as they move. */
+/* The hinge groove: a crisp dark line that cuts through every glyph where the
+   two flaps meet, so each tile reads as two physical flaps. The flaps share the
+   area above the grille, so the seam sits at the middle of that area — at the
+   true cell midline when there's no grille. Sits above the static halves but
+   below the flapping cards, which fold over it as they move. */
 .sf-unit::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(50% - 1.5px);
+  top: calc((100% - var(--sf-grille-height)) / 2 - 1.5px);
   height: 3px;
-  background: linear-gradient(
-    rgba(0, 0, 0, 0.55),
-    #000 45%,
-    #000 55%,
-    rgba(255, 255, 255, 0.05)
-  );
-  box-shadow:
-    0 -1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 3px rgba(0, 0, 0, 0.85);
+  background: var(--sf-hinge-bg);
+  box-shadow: var(--sf-hinge-shadow);
   z-index: 1;
+  pointer-events: none;
+}
+
+/* The grille: an opaque vent band sitting *below* the two flaps, filling the
+   bottom `--sf-grille-height` of the cell — the slot the drum turns behind on a
+   real split-flap unit. The flaps occupy only the area above it, so this is its
+   own band, not an overlay clipping the lower flap. Zero-height/transparent by
+   default (no grille); a theme gives it a height and a ridged bg. Colour chips
+   keep it too — the colour rides the flaps above, the drum reads through below. */
+.sf-unit::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--sf-grille-height);
+  background: var(--sf-grille-bg);
+  border-radius: 0 0 var(--sf-cell-radius) var(--sf-cell-radius);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.45);
+  z-index: 2;
   pointer-events: none;
 }
 
@@ -78,9 +171,11 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: calc(50% - 1px);
+  /* Half the flap area (the cell minus the grille below), so the two flaps are
+     always equal. Reduces to a clean 50% when there's no grille. */
+  height: calc((100% - var(--sf-grille-height)) / 2 - 1px);
   overflow: hidden;
-  color: #f5f4f1;
+  color: var(--sf-text-color);
 }
 
 /* The 3D context only needs to exist on the cards that actually rotate. Keeping
@@ -96,14 +191,17 @@
 
 .sf-top {
   top: 0;
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(#1c1c1e, #131314);
+  border-radius: var(--sf-cell-radius) var(--sf-cell-radius) 0 0;
+  background: var(--sf-top-bg);
 }
 
 .sf-bottom {
-  bottom: 0;
-  border-radius: 0 0 3px 3px;
-  background: linear-gradient(#121213, #08080a);
+  /* Directly below the top flap, ending where the grille begins — not pinned to
+     the cell bottom, so the lower flap stays equal to the upper one and the
+     grille sits beneath it. */
+  top: calc((100% - var(--sf-grille-height)) / 2);
+  border-radius: 0 0 var(--sf-cell-radius) var(--sf-cell-radius);
+  background: var(--sf-bottom-bg);
 }
 
 .sf-g {
@@ -118,6 +216,11 @@
   display: grid;
   place-items: center;
   overflow: visible;
+  /* Glyph faces ride `--sf-glyph-shift` so a theme can lift the type clear of a
+     tall grille. Identity (0) by default, so untouched themes don't move. Only
+     the glyph faces shift — colour chips (.sf-g-color) keep filling to the
+     grille. */
+  transform: translateY(var(--sf-glyph-shift, 0));
 }
 
 .sf-g-mark {
@@ -135,19 +238,20 @@
 .sf-whole-face .sf-g {
   top: 0;
   bottom: auto;
-  height: 100%;
+  /* Span only the flap area (above the grille) so a whole glyph stays centred
+     in the same space the split faces share. */
+  height: calc(100% - var(--sf-grille-height));
 }
 
 .sf-g-whole {
   display: block;
   overflow: visible;
+  transform: translateY(var(--sf-glyph-shift, 0));
 }
 
 .sf-svg-text {
-  fill: #f5f4f1;
-  font-family:
-    var(--font-geist-sans), "Noto Sans Kannada", "Noto Sans", system-ui,
-    sans-serif;
+  fill: var(--sf-text-color);
+  font-family: var(--sf-font);
   font-size: 82px;
   font-weight: 500;
   letter-spacing: 0;
@@ -168,14 +272,12 @@
 }
 
 .sf-text {
-  color: #f5f4f1;
+  color: var(--sf-text-color);
   display: block;
-  font-family:
-    var(--font-geist-sans), "Noto Sans Kannada", "Noto Sans", system-ui,
-    sans-serif;
+  font-family: var(--sf-font);
   font-size: 1.16em;
-  font-weight: 300;
-  letter-spacing: 0.01em;
+  font-weight: var(--sf-text-weight);
+  letter-spacing: var(--sf-text-tracking);
   line-height: 1;
   max-width: 100%;
   text-align: center;
@@ -211,7 +313,7 @@
 
 .sf-mark {
   fill: none;
-  stroke: #f5f4f1;
+  stroke: var(--sf-mark-color);
   stroke-width: 7;
   stroke-linecap: square;
   stroke-linejoin: miter;
@@ -365,4 +467,61 @@
   .sf-flip::after {
     animation: none !important;
   }
+}
+
+/* ---- theme presets ----
+ *
+ * Selected by the `theme` prop (which sets `data-flap-theme`). Each preset is
+ * nothing but a block of token overrides — the engine, layout and flap physics
+ * are identical across themes. Add a theme by adding a block here (and the name
+ * to the `FlapTheme` union in react.tsx); override individual tokens from the
+ * host app for anything a preset doesn't cover.
+ *
+ * `flapboard` is the default house look (a Vestaboard-style stealth slab). It
+ * only restates the defaults so selecting it explicitly is a no-op. */
+.sf-board[data-flap-theme="flapboard"] {
+  /* defaults — see the .sf-board token block above */
+}
+
+/* `flipflap` — credit to flipflap.io, whose tile treatment this echoes:
+ * lighter, crisply-outlined flaps that each read as a distinct mechanical card,
+ * a ridge texture banded across the lower leaf, and brighter, wider-tracked
+ * type. */
+.sf-board[data-flap-theme="flipflap"] {
+  --sf-board-bg: linear-gradient(#0e0e10, #060608);
+  --sf-board-radius: 16px;
+  /* lighter charcoal cards that read as distinct mechanical flaps, set in a dark
+     well so text flaps have a clean black bezel. */
+  --sf-cell-bg: #0c0c0f;
+  --sf-cell-radius: 5px;
+  --sf-cell-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.65), inset 0 -5px 9px rgba(0, 0, 0, 0.5);
+  --sf-top-bg: linear-gradient(#2b2b30, #232328);
+  --sf-bottom-bg: linear-gradient(#232328, #1a1a1f);
+  /* Card-like chips: two equal flaps with a drum grille below. Width is set by
+     the column count; this ratio keeps each chip clearly card-like (taller than
+     wide) while keeping the overall board landscape — close to the house flap
+     proportion — rather than letting six rows stack up into a square. */
+  --sf-cell-aspect: 11 / 20;
+  /* The drum grille: a short opaque band of engraved ridges (a faint highlight
+     over a dark groove, period 2.5px) filling the bottom of the chip, below the
+     two flaps. */
+  --sf-grille-height: 18%;
+  --sf-grille-bg: repeating-linear-gradient(
+    to bottom,
+    #16161a 0,
+    #16161a 1.5px,
+    #050506 1.5px,
+    #050506 2.5px
+  );
+  /* a crisp, clearly-visible hinge seam */
+  --sf-hinge-bg: linear-gradient(
+    rgba(0, 0, 0, 0.5),
+    #050505 45%,
+    #050505 55%,
+    rgba(255, 255, 255, 0.06)
+  );
+  --sf-text-color: #f4f3ef;
+  --sf-text-weight: 400;
+  --sf-text-tracking: 0.05em;
 }

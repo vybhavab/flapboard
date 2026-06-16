@@ -13,12 +13,16 @@ import {
 import { type Flap } from "./drum";
 import { FlapBoard as Engine, type CellEvent } from "./engine";
 import {
-  buildFlapGrid,
+  frame as frameLayer,
   isDenseGlyphCluster,
   isComplexScript,
+  resolve,
   shouldRenderWholeGlyph,
   show,
   type BoardDims,
+  type Declaration,
+  type Layer,
+  text as textLayer,
 } from "./layout";
 import { DEFAULT_TIMING, type FlapTiming } from "./timing";
 
@@ -29,6 +33,23 @@ import { DEFAULT_TIMING, type FlapTiming } from "./timing";
  * `sf-g sf-g-mark` className so it lays out like any other face.
  */
 export type GlyphMark = (props: { className: string }) => ReactNode;
+
+/**
+ * A shipped theme preset, selected via the `theme` prop. Each maps to a
+ * `data-flap-theme` value whose token overrides live in `styles.css`:
+ *
+ * - `"flapboard"` — the default house look (a Vestaboard-style stealth slab).
+ * - `"flipflap"` — lighter, crisply-outlined flaps with a ridged lower leaf,
+ *   echoing flipflap.io.
+ *
+ * The open `string` arm keeps autocomplete for the shipped names while still
+ * accepting any custom value — define your own `[data-flap-theme="…"]` block
+ * (or just override `--sf-*` tokens) in the host app and pass its name through.
+ */
+export type FlapTheme =
+  | "flapboard"
+  | "flipflap"
+  | (string & Record<never, never>);
 
 export type FlapBoardMotion = {
   /**
@@ -59,11 +80,16 @@ export const DEFAULT_MARKS: Record<string, GlyphMark> = {
 
 export type FlapBoardProps = {
   /** The message. Word-wrapped and centered unless `lines` is given. */
-  value: string;
-  /** Pin explicit lines instead of auto-wrapping `value`. */
+  text?: string;
+  /** Pin explicit lines instead of auto-wrapping `text`. Takes precedence over `text`. */
   lines?: readonly string[];
-  /** Flag palette painted around the perimeter. */
-  flag?: readonly string[];
+  /** Palette painted around the perimeter. */
+  frame?: readonly string[];
+  /** Expert declaration. Takes precedence over `text`, `lines`, and `frame`. */
+  layers?: Declaration;
+  /** Visual preset. Sets `data-flap-theme`; defaults to `"flapboard"`. Any
+   *  `--sf-*` token can also be overridden directly in CSS. */
+  theme?: FlapTheme;
   rows?: number;
   cols?: number;
   /** Target line length the wrap balancer aims for. */
@@ -84,7 +110,44 @@ export type FlapBoardProps = {
    *  deterministic animation (used by the visual tests). Defaults to Math.random. */
   random?: () => number;
   className?: string;
+  ariaLabel?: string;
 };
+
+function fromProps({
+  text,
+  lines,
+  frame,
+}: Pick<FlapBoardProps, "text" | "lines" | "frame">): Declaration {
+  const declaration: Layer[] = [];
+  if (frame?.length) declaration.push(frameLayer(frame));
+  if (text !== undefined || lines !== undefined) {
+    declaration.push(
+      textLayer(text ?? "", {
+        lines,
+        align: "center",
+        valign: "center",
+        wrap: "balance",
+      })
+    );
+  }
+  return declaration;
+}
+
+function defaultAriaLabel({
+  layers,
+  text,
+  lines,
+}: Pick<FlapBoardProps, "layers" | "text" | "lines">): string {
+  if (layers !== undefined) return "";
+  if (lines !== undefined) return lines.join(" ");
+  return text ?? "";
+}
+
+function shouldWarnDev(): boolean {
+  return (
+    typeof process === "undefined" || process.env.NODE_ENV !== "production"
+  );
+}
 
 function defaultReducedMotion(): boolean {
   return (
@@ -106,6 +169,8 @@ function Face({
     return (
       <span
         className="sf-g sf-g-color"
+        data-flap-face
+        data-flap-kind="color"
         style={{ backgroundColor: flap.value }}
       />
     );
@@ -116,6 +181,8 @@ function Face({
   return (
     <span
       className="sf-g sf-g-char"
+      data-flap-face
+      data-flap-kind="char"
       data-complex={isComplexScript(value) || undefined}
       data-dense={isDenseGlyphCluster(value) || undefined}
       aria-hidden="true"
@@ -143,6 +210,8 @@ function WholeGlyphFace({
   return (
     <svg
       className="sf-g sf-g-whole"
+      data-flap-face
+      data-flap-kind="whole"
       viewBox="0 0 100 100"
       preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
@@ -252,14 +321,24 @@ const Cell = memo(function Cell({
   const staticBottom = wholeFace ? BLANK_FLAP : animating ? prev : cur;
   const flipTop = wholeFace ? BLANK_FLAP : prev;
   const flipBottom = wholeFace ? BLANK_FLAP : cur;
+  const isSettledColor = !animating && cur.kind === "color";
+  const cellStyle = {
+    "--sf-cell-fold": `${foldMs}ms`,
+    ...(cur.kind === "color" ? { "--sf-color-flap": cur.value } : {}),
+  } as CSSProperties;
 
   return (
     <span
       className="sf-cell"
+      data-flap-cell
+      data-row={row}
+      data-col={col}
+      data-flap-state={animating ? "animating" : "idle"}
       data-whole-glyph={wholeFace || undefined}
-      style={{ "--sf-cell-fold": `${foldMs}ms` } as CSSProperties}
+      data-color-flap={isSettledColor || undefined}
+      style={cellStyle}
     >
-      <span className="sf-unit">
+      <span className="sf-unit" data-flap-unit>
         <span className="sf-half sf-top">
           <Face flap={staticTop} marks={marks} />
         </span>
@@ -291,10 +370,13 @@ const Cell = memo(function Cell({
  * `setTarget`, so updates are interruptible — change the message mid-flip and
  * the tiles redirect rather than restart.
  */
+export function FlapBoard(props: FlapBoardProps): ReactNode;
 export function FlapBoard({
-  value,
+  text,
   lines,
-  flag = [],
+  frame,
+  layers,
+  theme = "flapboard",
   rows = 6,
   cols = 23,
   idealLineCols = 16,
@@ -306,8 +388,50 @@ export function FlapBoard({
   marks,
   random,
   className,
+  ariaLabel,
 }: FlapBoardProps) {
   const dims: BoardDims = { rows, cols, idealLineCols };
+  const hasEasyContent =
+    text !== undefined || lines !== undefined || frame !== undefined;
+  const mixesLayersWithEasyContent = layers !== undefined && hasEasyContent;
+  const mixesTextAndLines = text !== undefined && lines !== undefined;
+  const warnedRef = useRef({
+    layersWithEasyContent: false,
+    textAndLines: false,
+  });
+
+  useEffect(() => {
+    if (!shouldWarnDev()) return;
+    if (
+      mixesLayersWithEasyContent &&
+      !warnedRef.current.layersWithEasyContent
+    ) {
+      console.warn(
+        "FlapBoard: `layers` takes precedence over `text`, `lines`, and `frame`; remove the ignored easy content props."
+      );
+      warnedRef.current.layersWithEasyContent = true;
+    }
+    if (mixesTextAndLines && !warnedRef.current.textAndLines) {
+      console.warn(
+        "FlapBoard: both `text` and `lines` were provided; `lines` takes precedence."
+      );
+      warnedRef.current.textAndLines = true;
+    }
+  }, [mixesLayersWithEasyContent, mixesTextAndLines]);
+
+  const declaration = useMemo(
+    () => layers ?? fromProps({ text, lines, frame }),
+    [layers, text, lines, frame]
+  );
+  const targetSig = useMemo(
+    () => JSON.stringify([rows, cols, idealLineCols, declaration]),
+    [rows, cols, idealLineCols, declaration]
+  );
+  const targetGrid = useMemo(
+    () => resolve(declaration, dims),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [targetSig]
+  );
 
   // Resolve the mark map once per distinct `marks` prop so memo'd Cells aren't
   // forced to re-render on every parent render by a fresh object identity.
@@ -338,7 +462,7 @@ export function FlapBoard({
       random,
     });
     // First target snaps; no intro flap on initial paint.
-    nextEngine.setTarget(buildFlapGrid(value, lines, flag, dims));
+    nextEngine.setTarget(targetGrid);
     return nextEngine;
   });
 
@@ -355,16 +479,14 @@ export function FlapBoard({
 
   // Retarget whenever the message changes. Skip the very first run (the engine
   // was already snapped to it during creation).
-  const sig = JSON.stringify([value, lines ?? [], flag]);
   const firstRun = useRef(true);
   useEffect(() => {
     if (firstRun.current) {
       firstRun.current = false;
       return;
     }
-    engine.setTarget(buildFlapGrid(value, lines, flag, dims));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, sig]);
+    engine.setTarget(targetGrid);
+  }, [engine, targetGrid, targetSig]);
 
   const cells: React.ReactNode[] = [];
   for (let r = 0; r < rows; r++) {
@@ -387,8 +509,10 @@ export function FlapBoard({
       className={
         className ? `sf-board font-mono ${className}` : "sf-board font-mono"
       }
+      data-flap-theme={theme}
+      data-flap-board
       role="img"
-      aria-label={value}
+      aria-label={ariaLabel ?? defaultAriaLabel({ layers, text, lines })}
       style={
         {
           "--cols": cols,

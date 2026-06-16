@@ -1,8 +1,8 @@
 /**
  * flapboard — an interruptible split-flap display engine.
  *
- * The framework-agnostic core lives here; the React view is at `flapboard/react`
- * and the styles at `flapboard/styles.css`.
+ * The framework-agnostic core lives here; the React view is at
+ * `@vybhavab/flapboard/react` and the styles at `@vybhavab/flapboard/styles.css`.
  */
 
 export { FlapBoard as FlapBoardEngine } from "./engine";
@@ -19,12 +19,30 @@ export {
 
 export {
   buildFlapGrid,
+  color,
+  fullRect,
+  frame,
   graphemes,
+  gridToText,
   isDenseGlyphCluster,
   isComplexScript,
+  region,
+  resolve,
   shouldRenderWholeGlyph,
   show,
+  text,
   type BoardDims,
+  type ColorLayer,
+  type ColorLayerOptions,
+  type ColorMode,
+  type Declaration,
+  type Layer,
+  type Rect,
+  type TextLayer,
+  type TextLayerOptions,
+  type TextAlign,
+  type TextOverflow,
+  type TextWrap,
   DEFAULT_DIMS,
 } from "./layout";
 
@@ -36,5 +54,5 @@ export {
 } from "./timing";
 
 // NOTE: the glyph-mark API (DEFAULT_MARKS, GlyphMark) and FlapBoardProps live on
-// the React entry (`flapboard/react`), not here — DEFAULT_MARKS is JSX, and this
-// core entry stays framework-agnostic (no React import).
+// the React entry (`@vybhavab/flapboard/react`), not here — DEFAULT_MARKS is JSX,
+// and this core entry stays framework-agnostic (no React import).

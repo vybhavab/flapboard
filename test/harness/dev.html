@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>flapboard dev preview</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #1a1a1a;
+      }
+      /* Real-time preview for eyeballing the design (not the deterministic test
+         harness). Animates on wall-clock rAF so a settled board is just "wait". */
+      #root {
+        --font-geist-sans: "Helvetica Neue", Arial, sans-serif;
+        display: grid;
+        gap: 40px;
+        padding: 48px;
+        place-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./dev.tsx"></script>
+  </body>
+</html>

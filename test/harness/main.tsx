@@ -3,7 +3,7 @@
  * driver on `window.__flap` for Playwright:
  *
  *   reset(seed, opts) — remount with a fresh seeded engine and clock at 0
- *   setMessage(value, flag, marks?) — retarget the board
+ *   setMessage(value, frame, marks?) — retarget the board
  *   tick(ms) — advance the *engine* clock and run the queued rAF frames
  *   pendingFrames() — how many rAF frames are queued (0 ⇒ board at rest)
  *
@@ -15,12 +15,19 @@
  */
 import { createRoot, type Root } from "react-dom/client";
 
-import { FlapBoard, type GlyphMark } from "../../src/react";
+import { FlapBoard, type FlapTheme, type GlyphMark } from "../../src/react";
 
 import "../../src/styles.css";
 import { mulberry32 } from "../support/rng";
 
-type Opts = { value?: string; flag?: string[]; rows?: number; cols?: number };
+type Opts = {
+  value?: string;
+  lines?: string[];
+  frame?: string[];
+  rows?: number;
+  cols?: number;
+  theme?: FlapTheme;
+};
 
 // --- manual clock + rAF queue, installed over the globals the engine uses ---
 // `performance.now` can be non-writable, so define it (strict-mode ESM would
@@ -40,22 +47,26 @@ let root: Root | null = null;
 let mountKey = 0;
 let random: () => number = mulberry32(1);
 let state: {
-  value: string;
-  flag: string[];
+  value?: string;
+  lines?: string[];
+  frame: string[];
   rows: number;
   cols: number;
+  theme: FlapTheme;
   marks?: Record<string, GlyphMark>;
-} = { value: "", flag: [], rows: 6, cols: 23 };
+} = { frame: [], rows: 6, cols: 23, theme: "flapboard" };
 
 function render() {
   root ??= createRoot(document.getElementById("root")!);
   root.render(
     <FlapBoard
       key={mountKey}
-      value={state.value}
-      flag={state.flag}
+      text={state.value}
+      lines={state.lines}
+      frame={state.frame}
       rows={state.rows}
       cols={state.cols}
+      theme={state.theme}
       marks={state.marks}
       random={random}
     />
@@ -76,18 +87,21 @@ window.__flap = {
     mountKey++;
     random = mulberry32(seed);
     state = {
-      value: opts.value ?? "",
-      flag: opts.flag ?? [],
+      value: opts.value,
+      lines: opts.lines,
+      frame: opts.frame ?? [],
       rows: opts.rows ?? 6,
       cols: opts.cols ?? 23,
+      theme: opts.theme ?? "flapboard",
     };
     render();
   },
-  setMessage(value: string, flag: string[] = [], useArrowMark = false) {
+  setMessage(value: string, frame: string[] = [], useArrowMark = false) {
     state = {
       ...state,
       value,
-      flag,
+      lines: undefined,
+      frame,
       marks: useArrowMark ? { "→": arrowMark } : undefined,
     };
     render();
@@ -109,7 +123,7 @@ declare global {
       reset: (seed?: number, opts?: Opts) => void;
       setMessage: (
         value: string,
-        flag?: string[],
+        frame?: string[],
         useArrowMark?: boolean
       ) => void;
       tick: (ms: number) => void;
